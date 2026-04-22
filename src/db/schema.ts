@@ -37,7 +37,6 @@ export const stockRows = pgTable(
     productName: text('product_name').notNull().default(''),
     productNameJa: text('product_name_ja').notNull().default(''),
     stockQty: doublePrecision('stock_qty').notNull().default(0),
-    stockCost: doublePrecision('stock_cost').notNull().default(0),
     uploadedAt: timestamp('uploaded_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [

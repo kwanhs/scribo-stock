@@ -4,7 +4,8 @@
 export async function uploadRedactedStockCsv(file: File): Promise<{
   ok: true
   rowsParsed: number
-  rowsUpserted: number
+  rowsUniqueInFile: number
+  rowsInserted: number
 }> {
   const form = new FormData()
   form.set('file', file)
@@ -24,6 +25,7 @@ export async function uploadRedactedStockCsv(file: File): Promise<{
   return {
     ok: true,
     rowsParsed: Number(body.rowsParsed) || 0,
-    rowsUpserted: Number(body.rowsUpserted) || 0,
+    rowsUniqueInFile: Number(body.rowsUniqueInFile) || 0,
+    rowsInserted: Number(body.rowsInserted) || 0,
   }
 }

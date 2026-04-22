@@ -18,7 +18,6 @@ CREATE TABLE IF NOT EXISTS "stock_rows" (
 	"product_name" text DEFAULT '' NOT NULL,
 	"product_name_ja" text DEFAULT '' NOT NULL,
 	"stock_qty" double precision DEFAULT 0 NOT NULL,
-	"stock_cost" double precision DEFAULT 0 NOT NULL,
 	"uploaded_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint

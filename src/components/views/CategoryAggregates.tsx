@@ -20,7 +20,7 @@ const LEVELS: { value: Level; label: string; nameKey: keyof StockRow }[] = [
 
 interface Agg {
   code: string; name: string;
-  stockQty: number; stockCost: number;
+  stockQty: number;
   productCount: Set<string>;
 }
 
@@ -47,13 +47,12 @@ export const CategoryAggregates = ({ rows }: Props) => {
         a = {
           code,
           name: String(r[cfg.nameKey] || ""),
-          stockQty: 0, stockCost: 0,
+          stockQty: 0,
           productCount: new Set(),
         };
         map.set(code, a);
       }
       a.stockQty += r.stockQty;
-      a.stockCost += r.stockCost;
       a.productCount.add(r.barcode);
     }
     return Array.from(map.values()).sort((a, b) => b.stockQty - a.stockQty);

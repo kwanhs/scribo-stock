@@ -20,7 +20,6 @@ export interface StockRow {
   productName: string;
   productNameJa: string;
   stockQty: number;
-  stockCost: number;
   uploadedAt: number;
 }
 
@@ -106,7 +105,6 @@ export function mapCsvRow(r: Record<string, unknown>): StockRow | null {
     productName: str(pick(r, "商品名")),
     productNameJa: str(pick(r, "商品名(日本名)")),
     stockQty: num(pick(r, "庫存數量")),
-    stockCost: num(pick(r, "庫存成本價")),
     uploadedAt: Date.now(),
   };
 }

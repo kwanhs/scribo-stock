@@ -12,7 +12,7 @@ interface Props { rows: StockRow[]; }
 
 interface AggKey {
   storeCode: string; storeName: string; barcode: string; productName: string;
-  qty: number; cost: number;
+  qty: number;
 }
 
 export const StockByStore = ({ rows }: Props) => {
@@ -33,12 +33,11 @@ export const StockByStore = ({ rows }: Props) => {
       const cur = map.get(k);
       if (cur) {
         cur.qty += r.stockQty;
-        cur.cost += r.stockCost;
       } else {
         map.set(k, {
           storeCode: r.storeCode, storeName: r.storeName,
           barcode: r.barcode, productName: r.productName,
-          qty: r.stockQty, cost: r.stockCost,
+          qty: r.stockQty,
         });
       }
     }
