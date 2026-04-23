@@ -1,27 +1,8 @@
 import { openDB, type IDBPDatabase } from "idb";
 
-export interface StockRow {
-  id: string; // periodFrom|periodTo|storeCode|barcode
-  periodFrom: string;
-  periodTo: string;
-  storeCode: string;
-  storeName: string;
-  groupCode: string;
-  groupName: string;
-  divCode: string;
-  divName: string;
-  dptCode: string;
-  dptName: string;
-  lineCode: string;
-  lineName: string;
-  classCode: string;
-  className: string;
-  barcode: string;
-  productName: string;
-  productNameJa: string;
-  stockQty: number;
-  uploadedAt: number;
-}
+import type { StockRow } from "#/db/schema";
+
+export type { StockRow } from "#/db/schema";
 
 const DB_NAME = "stock-portal";
 const STORE = "rows";

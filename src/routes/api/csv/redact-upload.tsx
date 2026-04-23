@@ -4,9 +4,9 @@ import Papa from 'papaparse'
 import { and, eq, or } from 'drizzle-orm'
 
 import { db } from '#/db/index'
-import { stockRows } from '#/db/schema'
+import { stockRows, type StockRow } from '#/db/schema'
 import { insertStockRowSchema } from '#/db/schema.zod'
-import { mapCsvRow, type StockRow } from '#/lib/stockDb'
+import { mapCsvRow } from '#/lib/stockDb'
 import { redactStockCsvWithPython } from '#/server/redactStockCsv'
 
 function stockRowToInsert(row: StockRow) {

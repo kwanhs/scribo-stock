@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 
 import { getClient } from '#/db'
+import type { Todo } from '#/db/schema'
 
 const getTodos = createServerFn({
   method: 'GET',
@@ -10,10 +11,7 @@ const getTodos = createServerFn({
   if (!client) {
     return undefined
   }
-  return (await client.query(`SELECT * FROM todos`)) as Array<{
-    id: number
-    title: string
-  }>
+  return (await client.query(`SELECT * FROM todos`)) as Todo[]
 })
 
 const insertTodo = createServerFn({
@@ -80,7 +78,7 @@ function App() {
           <>
             <h1 className="text-2xl font-bold mb-4">Todos</h1>
             <ul className="space-y-3 mb-6">
-              {todos.map((todo: { id: number; title: string }) => (
+              {todos.map((todo) => (
                 <li
                   key={todo.id}
                   className="bg-white/10 backdrop-blur-sm rounded-lg p-4 shadow-sm border border-white/20 transition-all hover:bg-white/20 hover:scale-[1.02] cursor-pointer group"

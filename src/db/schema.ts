@@ -14,6 +14,9 @@ export const todos = pgTable('todos', {
   createdAt: timestamp('created_at').defaultNow(),
 })
 
+export type Todo = typeof todos.$inferSelect
+export type TodoInsert = typeof todos.$inferInsert
+
 /** Stock snapshot rows aligned with CSV import / client `StockRow` shape. */
 export const stockRows = pgTable(
   'stock_rows',
@@ -48,3 +51,16 @@ export const stockRows = pgTable(
     ),
   ],
 )
+
+/** Row as stored in Postgres (Drizzle-inferred). */
+export type StockRowSelect = typeof stockRows.$inferSelect
+export type StockRowInsert = typeof stockRows.$inferInsert
+
+/**
+ * Client / IndexedDB / CSV-mapped row: composite key string and epoch ms for `uploadedAt`
+ * (Drizzle select shape otherwise).
+ */
+export type StockRow = Omit<StockRowSelect, 'id' | 'uploadedAt'> & {
+  id: string
+  uploadedAt: number
+}
