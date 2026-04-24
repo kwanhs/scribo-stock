@@ -1,90 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-router/ssr/client'
 import Papa from 'papaparse'
-import { and, eq, or } from 'drizzle-orm'
 
-import { db } from '#/db/index'
-import { stockRows, type StockRow } from '#/db/schema'
 import { insertStockRowSchema } from '#/db/schema.zod'
 import { mapCsvRow } from '#/lib/stockDb'
 import { redactStockCsvWithPython } from '#/server/redactStockCsv'
-
-function stockRowToInsert(row: StockRow) {
-  return {
-    periodFrom: row.periodFrom,
-    periodTo: row.periodTo,
-    storeCode: row.storeCode,
-    storeName: row.storeName,
-    groupCode: row.groupCode,
-    groupName: row.groupName,
-    divCode: row.divCode,
-    divName: row.divName,
-    dptCode: row.dptCode,
-    dptName: row.dptName,
-    lineCode: row.lineCode,
-    lineName: row.lineName,
-    classCode: row.classCode,
-    className: row.className,
-    barcode: row.barcode,
-    productName: row.productName,
-    productNameJa: row.productNameJa,
-    stockQty: row.stockQty,
-    uploadedAt: new Date(row.uploadedAt),
-  }
-}
-
-function naturalKey(row: ReturnType<typeof stockRowToInsert>) {
-  return `${row.periodFrom}|${row.periodTo}|${row.storeCode}|${row.barcode}`
-}
-
-/** Reject upload if any row already exists (no partial inserts, no silent skips vs DB). */
-async function findExistingNaturalKeyInDb(
-  rows: ReturnType<typeof stockRowToInsert>[],
-): Promise<string | undefined> {
-  const OR_CHUNK = 80
-  for (let i = 0; i < rows.length; i += OR_CHUNK) {
-    const batch = rows.slice(i, i + OR_CHUNK)
-    const condition = or(
-      ...batch.map((r) =>
-        and(
-          eq(stockRows.periodFrom, r.periodFrom),
-          eq(stockRows.periodTo, r.periodTo),
-          eq(stockRows.storeCode, r.storeCode),
-          eq(stockRows.barcode, r.barcode),
-        ),
-      ),
-    )
-    if (!condition) continue
-    const hit = await db
-      .select({
-        periodFrom: stockRows.periodFrom,
-        periodTo: stockRows.periodTo,
-        storeCode: stockRows.storeCode,
-        barcode: stockRows.barcode,
-      })
-      .from(stockRows)
-      .where(condition)
-      .limit(1)
-    if (hit.length > 0) {
-      const r = hit[0]!
-      return `${r.periodFrom}|${r.periodTo}|${r.storeCode}|${r.barcode}`
-    }
-  }
-  return undefined
-}
-
-/** Insert rows after caller verified keys are absent from DB. */
-async function insertStockRows(rows: ReturnType<typeof stockRowToInsert>[]) {
-  if (!rows.length) return 0
-  const CHUNK = 500
-  let inserted = 0
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const batch = rows.slice(i, i + CHUNK)
-    const res = await db.insert(stockRows).values(batch).returning({ id: stockRows.id })
-    inserted += res.length
-  }
-  return inserted
-}
+import { clientStockRowToInsert, insertStockRowsStrict } from '#/server/stockRows'
 
 export const Route = createFileRoute('/api/csv/redact-upload')({
   component: () => null,
@@ -131,31 +52,17 @@ export const Route = createFileRoute('/api/csv/redact-upload')({
           )
         }
 
-        const byNaturalKey = new Map<string, ReturnType<typeof stockRowToInsert>>()
+        const inserts = []
         for (const r of parsed.data) {
           const row = mapCsvRow(r)
           if (!row) continue
-          const insert = stockRowToInsert(row)
+          const insert = clientStockRowToInsert(row)
           const check = insertStockRowSchema.safeParse(insert)
           if (!check.success) continue
-          const k = naturalKey(insert)
-          if (byNaturalKey.has(k)) {
-            return json(
-              {
-                error: 'Duplicate rows in file.',
-                detail:
-                  'The same period, store, and barcode appears more than once. Remove duplicates before uploading.',
-                duplicateKey: k,
-              },
-              { status: 409 },
-            )
-          }
-          byNaturalKey.set(k, insert)
+          inserts.push(insert)
         }
 
-        const mapped = [...byNaturalKey.values()]
-
-        if (!mapped.length) {
+        if (!inserts.length) {
           return json(
             {
               error: 'No valid stock rows after redaction.',
@@ -166,26 +73,35 @@ export const Route = createFileRoute('/api/csv/redact-upload')({
           )
         }
 
-        const existingKey = await findExistingNaturalKeyInDb(mapped)
-        if (existingKey !== undefined) {
+        const result = await insertStockRowsStrict(inserts)
+        if (!result.ok) {
+          if (result.reason === 'duplicate_in_file') {
+            return json(
+              {
+                error: 'Duplicate rows in file.',
+                detail:
+                  'The same period, store, and barcode appears more than once. Remove duplicates before uploading.',
+                duplicateKey: result.duplicateKey,
+              },
+              { status: 409 },
+            )
+          }
           return json(
             {
               error: 'Data already uploaded.',
               detail:
                 'One or more rows match existing data for the same period, store, and barcode. Remove overlapping rows or use a different file.',
-              duplicateKey: existingKey,
+              duplicateKey: result.duplicateKey,
             },
             { status: 409 },
           )
         }
 
-        const rowsInserted = await insertStockRows(mapped)
-
         return json({
           ok: true,
           rowsParsed: parsed.data.length,
-          rowsUniqueInFile: mapped.length,
-          rowsInserted,
+          rowsUniqueInFile: inserts.length,
+          rowsInserted: result.rowsInserted,
         })
       },
     },

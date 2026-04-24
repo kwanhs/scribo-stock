@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DemoNeonRouteImport } from './routes/demo/neon'
 import { Route as DemoDrizzleRouteImport } from './routes/demo/drizzle'
 import { Route as ApiCsvRedactUploadRouteImport } from './routes/api/csv/redact-upload'
+import { Route as ApiStockRowsRouteImport } from './routes/api/stock/rows'
 
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
@@ -46,6 +47,11 @@ const ApiCsvRedactUploadRoute = ApiCsvRedactUploadRouteImport.update({
   path: '/api/csv/redact-upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiStockRowsRoute = ApiStockRowsRouteImport.update({
+  id: '/api/stock/rows',
+  path: '/api/stock/rows',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/demo/drizzle': typeof DemoDrizzleRoute
   '/demo/neon': typeof DemoNeonRoute
   '/api/csv/redact-upload': typeof ApiCsvRedactUploadRoute
+  '/api/stock/rows': typeof ApiStockRowsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/demo/drizzle': typeof DemoDrizzleRoute
   '/demo/neon': typeof DemoNeonRoute
   '/api/csv/redact-upload': typeof ApiCsvRedactUploadRoute
+  '/api/stock/rows': typeof ApiStockRowsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +79,7 @@ export interface FileRoutesById {
   '/demo/drizzle': typeof DemoDrizzleRoute
   '/demo/neon': typeof DemoNeonRoute
   '/api/csv/redact-upload': typeof ApiCsvRedactUploadRoute
+  '/api/stock/rows': typeof ApiStockRowsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,6 +90,7 @@ export interface FileRouteTypes {
     | '/demo/drizzle'
     | '/demo/neon'
     | '/api/csv/redact-upload'
+    | '/api/stock/rows'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,6 +99,7 @@ export interface FileRouteTypes {
     | '/demo/drizzle'
     | '/demo/neon'
     | '/api/csv/redact-upload'
+    | '/api/stock/rows'
   id:
     | '__root__'
     | '/'
@@ -97,6 +108,7 @@ export interface FileRouteTypes {
     | '/demo/drizzle'
     | '/demo/neon'
     | '/api/csv/redact-upload'
+    | '/api/stock/rows'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -106,6 +118,7 @@ export interface RootRouteChildren {
   DemoDrizzleRoute: typeof DemoDrizzleRoute
   DemoNeonRoute: typeof DemoNeonRoute
   ApiCsvRedactUploadRoute: typeof ApiCsvRedactUploadRoute
+  ApiStockRowsRoute: typeof ApiStockRowsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -152,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCsvRedactUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/stock/rows': {
+      id: '/api/stock/rows'
+      path: '/api/stock/rows'
+      fullPath: '/api/stock/rows'
+      preLoaderRoute: typeof ApiStockRowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -162,6 +182,7 @@ const rootRouteChildren: RootRouteChildren = {
   DemoDrizzleRoute: DemoDrizzleRoute,
   DemoNeonRoute: DemoNeonRoute,
   ApiCsvRedactUploadRoute: ApiCsvRedactUploadRoute,
+  ApiStockRowsRoute: ApiStockRowsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

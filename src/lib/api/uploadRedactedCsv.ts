@@ -1,5 +1,5 @@
 /**
- * POST the raw CSV to the server: Python redacts cost/price columns, then rows are upserted into Postgres.
+ * POST the raw CSV to the server: Python redacts cost/price columns, then rows are inserted into Postgres (rejects duplicates in file or vs DB).
  */
 export async function uploadRedactedStockCsv(file: File): Promise<{
   ok: true
