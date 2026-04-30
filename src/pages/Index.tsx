@@ -1,6 +1,4 @@
-import { useMemo, useState } from "react";
-import { Boxes, Layers, PackageSearch, Store, Trash2 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Boxes, CalendarDays, Layers, PackageSearch, Store, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -8,35 +6,28 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CsvUploader } from "@/components/CsvUploader";
 import { StatCard } from "@/components/StatCard";
-import { StockByStore } from "@/components/views/StockByStore";
 import { ProductSearch } from "@/components/views/ProductSearch";
-import { CategoryAggregates } from "@/components/views/CategoryAggregates";
-import { useStockData } from "@/hooks/useStockData";
-import { clearAll } from "@/lib/stockDb";
+import { useStockSummary } from "@/hooks/useStockData";
+import { deleteStockRows } from "@/lib/api/stockRows";
 import { fmtInt } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 
-const Index = () => {
-  const { rows, loading, refresh } = useStockData();
-  const [tab, setTab] = useState("stores");
-  const { toast } = useToast();
+const formatStockDate = (periodFrom: string | null, periodTo: string | null) => {
+  if (periodFrom && periodTo) {
+    return periodFrom === periodTo ? periodTo : `${periodFrom} to ${periodTo}`;
+  }
+  return "—";
+};
 
-  const stats = useMemo(() => {
-    const stores = new Set<string>();
-    const products = new Set<string>();
-    let qty = 0;
-    for (const r of rows) {
-      stores.add(r.storeCode);
-      products.add(r.barcode);
-      qty += r.stockQty;
-    }
-    return { stores: stores.size, products: products.size, qty };
-  }, [rows]);
+const Index = () => {
+  const { summary, loading, refresh } = useStockSummary();
+  const { toast } = useToast();
+  const hasData = (summary?.rows ?? 0) > 0;
 
   const handleClear = async () => {
-    await clearAll();
+    await deleteStockRows();
     await refresh();
-    toast({ title: "Data cleared", description: "All uploaded rows removed." });
+    toast({ title: "Data cleared", description: "All uploaded rows removed from the backend database." });
   };
 
   return (
@@ -52,7 +43,7 @@ const Index = () => {
               <p className="text-xs text-muted-foreground">Multi-store inventory overview</p>
             </div>
           </div>
-          {rows.length > 0 && (
+          {hasData && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="ghost" size="sm" className="text-muted-foreground">
@@ -63,7 +54,7 @@ const Index = () => {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Clear all uploaded data?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This removes all {fmtInt(rows.length)} rows from your local database. You can re-upload at any time.
+                    This removes all {fmtInt(summary?.rows ?? 0)} rows from the backend database. You can re-upload at any time.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -79,17 +70,28 @@ const Index = () => {
       <main className="container space-y-6 py-8">
         <CsvUploader onUploaded={refresh} />
 
-        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <StatCard label="Stores" value={fmtInt(stats.stores)} icon={Store} />
-          <StatCard label="Products (SKUs)" value={fmtInt(stats.products)} icon={PackageSearch} />
-          <StatCard label="Stock units" value={fmtInt(stats.qty)} hint={`${fmtInt(rows.length)} rows`} icon={Layers} />
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Stores" value={fmtInt(summary?.stores ?? 0)} icon={Store} />
+          <StatCard label="Products (SKUs)" value={fmtInt(summary?.products ?? 0)} icon={PackageSearch} />
+          <StatCard
+            label="Stock units"
+            value={fmtInt(summary?.qty ?? 0)}
+            hint={`${fmtInt(summary?.rows ?? 0)} rows`}
+            icon={Layers}
+          />
+          <StatCard
+            label="Stock data date"
+            value={formatStockDate(summary?.periodFrom ?? null, summary?.periodTo ?? null)}
+            hint="Latest uploaded snapshot"
+            icon={CalendarDays}
+          />
         </section>
 
         {loading ? (
           <div className="rounded-xl border border-border/60 bg-card p-10 text-center text-muted-foreground shadow-card">
             Loading…
           </div>
-        ) : rows.length === 0 ? (
+        ) : !hasData ? (
           <div className="rounded-xl border border-dashed border-border bg-card/60 p-12 text-center">
             <h2 className="mb-2 text-lg font-semibold">No data yet</h2>
             <p className="text-sm text-muted-foreground">
@@ -97,16 +99,11 @@ const Index = () => {
             </p>
           </div>
         ) : (
-          <Tabs value={tab} onValueChange={setTab}>
-            <TabsList className="grid w-full max-w-xl grid-cols-3">
-              <TabsTrigger value="stores">Stock by store</TabsTrigger>
-              <TabsTrigger value="search">Product search</TabsTrigger>
-              <TabsTrigger value="categories">Categories</TabsTrigger>
-            </TabsList>
-            <TabsContent value="stores" className="mt-4"><StockByStore rows={rows} /></TabsContent>
-            <TabsContent value="search" className="mt-4"><ProductSearch rows={rows} /></TabsContent>
-            <TabsContent value="categories" className="mt-4"><CategoryAggregates rows={rows} /></TabsContent>
-          </Tabs>
+          <ProductSearch
+            hasData={hasData}
+            periodFrom={summary?.periodFrom ?? null}
+            periodTo={summary?.periodTo ?? null}
+          />
         )}
       </main>
     </div>

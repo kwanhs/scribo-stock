@@ -3,7 +3,9 @@ import Papa from "papaparse";
 import { Upload, Loader2, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { mapCsvRow, upsertRows, type StockRow } from "@/lib/stockDb";
+import { postStockRows } from "@/lib/api/stockRows";
+import { mapCsvRow } from "@/lib/stockDb";
+import type { StockRowInsert } from "@/db/schema";
 
 interface Props {
   onUploaded: () => void;
@@ -22,7 +24,7 @@ export const CsvUploader = ({ onUploaded }: Props) => {
     setProgress(0);
     let total = 0;
     let kept = 0;
-    let buffer: StockRow[] = [];
+    let buffer: StockRowInsert[] = [];
     const pending: Promise<void>[] = [];
 
     try {
@@ -45,7 +47,7 @@ export const CsvUploader = ({ onUploaded }: Props) => {
               buffer = [];
               parser.pause();
               pending.push(
-                upsertRows(batch)
+                postStockRows(batch)
                   .then(() => {
                     kept = kept + batch.length;
                     parser.resume();
@@ -62,7 +64,10 @@ export const CsvUploader = ({ onUploaded }: Props) => {
             (async () => {
               try {
                 await Promise.all(pending);
-                if (buffer.length) await upsertRows(buffer);
+                if (buffer.length) {
+                  await postStockRows(buffer);
+                  kept = kept + buffer.length;
+                }
                 resolve();
               } catch (e) {
                 reject(e);

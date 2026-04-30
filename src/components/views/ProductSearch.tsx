@@ -1,58 +1,57 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
+import useSWR from "swr";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fmtInt } from "@/lib/format";
-import type { StockRow } from "@/lib/stockDb";
+import { fetchProductSearch } from "@/lib/api/stockRows";
 
-interface Props { rows: StockRow[]; }
-
-interface ProductHit {
-  barcode: string;
-  productName: string;
-  productNameJa: string;
-  totalQty: number;
-  byStore: { storeCode: string; storeName: string; qty: number }[];
+interface Props {
+  hasData: boolean;
+  periodFrom: string | null;
+  periodTo: string | null;
 }
 
-export const ProductSearch = ({ rows }: Props) => {
-  const [query, setQuery] = useState("");
+const SEARCH_LIMIT = 50;
 
-  const hits = useMemo<ProductHit[]>(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    const products = new Map<string, ProductHit>();
-    for (const r of rows) {
-      const match =
-        r.barcode.toLowerCase().includes(q) ||
-        r.productName.toLowerCase().includes(q) ||
-        r.productNameJa.toLowerCase().includes(q);
-      if (!match) continue;
-      let p = products.get(r.barcode);
-      if (!p) {
-        p = {
-          barcode: r.barcode,
-          productName: r.productName,
-          productNameJa: r.productNameJa,
-          totalQty: 0,
-          byStore: [],
-        };
-        products.set(r.barcode, p);
-      }
-      p.totalQty += r.stockQty;
-      const existing = p.byStore.find((s) => s.storeCode === r.storeCode);
-      if (existing) {
-        existing.qty += r.stockQty;
-      } else {
-        p.byStore.push({ storeCode: r.storeCode, storeName: r.storeName, qty: r.stockQty });
-      }
-    }
-    return Array.from(products.values())
-      .sort((a, b) => a.barcode.localeCompare(b.barcode) || a.productName.localeCompare(b.productName))
-      .slice(0, 50);
-  }, [rows, query]);
+function formatStockDate(periodFrom: string | null, periodTo: string | null) {
+  if (periodFrom && periodTo) {
+    return periodFrom === periodTo ? periodTo : `${periodFrom} to ${periodTo}`;
+  }
+  return "—";
+}
+
+export const ProductSearch = ({ hasData, periodFrom, periodTo }: Props) => {
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedQuery(query.trim());
+    }, 250);
+    return () => window.clearTimeout(timeout);
+  }, [query]);
+
+  const searchKey = debouncedQuery ? ["product-search", debouncedQuery, SEARCH_LIMIT] : null;
+  const { data, error, isLoading } = useSWR(
+    searchKey,
+    ([, searchQuery, limit]: [string, string, number]) =>
+      fetchProductSearch({ query: searchQuery, limit }),
+  );
+
+  const stockDate = useMemo(
+    () =>
+      formatStockDate(
+        data?.periodFrom ?? periodFrom ?? null,
+        data?.periodTo ?? periodTo ?? null,
+      ),
+    [data?.periodFrom, data?.periodTo, periodFrom, periodTo],
+  );
+  const hits = data?.products ?? [];
+  const hasQuery = debouncedQuery.length > 0;
 
   return (
     <div className="space-y-4">
@@ -66,10 +65,46 @@ export const ProductSearch = ({ rows }: Props) => {
         />
       </div>
 
-      {!query.trim() && (
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-card/70 px-4 py-3 text-sm text-muted-foreground">
+        <span>Searches run on the backend against the latest uploaded stock snapshot.</span>
+        <span>
+          Stock date: <span className="font-medium text-foreground">{stockDate}</span>
+        </span>
+      </div>
+
+      {!hasData && (
         <Card className="border-dashed bg-card/50 p-10 text-center text-muted-foreground">
-          Start typing to search across {fmtInt(rows.length)} stock rows.
+          Upload a stock CSV to start searching products.
         </Card>
+      )}
+
+      {hasData && !query.trim() && (
+        <Card className="border-dashed bg-card/50 p-10 text-center text-muted-foreground">
+          Start typing to search products from the backend.
+        </Card>
+      )}
+
+      {error && (
+        <Card className="border-destructive/40 bg-destructive/5 p-6 text-sm text-destructive">
+          Failed to load product search results: {error instanceof Error ? error.message : "Unknown error"}
+        </Card>
+      )}
+
+      {isLoading && hasQuery && (
+        <div className="space-y-3">
+          {Array.from({ length: 2 }).map((_, index) => (
+            <Card key={index} className="overflow-hidden border-border/60 shadow-card">
+              <div className="space-y-2 border-b px-5 py-4">
+                <Skeleton className="h-5 w-48" />
+                <Skeleton className="h-4 w-72" />
+              </div>
+              <div className="space-y-2 px-5 py-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </Card>
+          ))}
+        </div>
       )}
 
       <div className="space-y-3">
@@ -114,8 +149,10 @@ export const ProductSearch = ({ rows }: Props) => {
           </Card>
         ))}
 
-        {query.trim() && hits.length === 0 && (
-          <Card className="border-dashed p-10 text-center text-muted-foreground">No products match "{query}".</Card>
+        {hasQuery && !isLoading && hits.length === 0 && (
+          <Card className="border-dashed p-10 text-center text-muted-foreground">
+            No products match "{debouncedQuery}".
+          </Card>
         )}
       </div>
     </div>

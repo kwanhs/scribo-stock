@@ -1,4 +1,4 @@
-import { and, desc, eq, or } from 'drizzle-orm'
+import { and, asc, desc, eq, or, sql } from 'drizzle-orm'
 
 import { getDb } from '#/db/index'
 import { stockRows, type StockRow, type StockRowInsert, type StockRowSelect } from '#/db/schema'
@@ -7,6 +7,32 @@ export type StockRowsInsertResult =
   | { ok: true; rowsInserted: number }
   | { ok: false; reason: 'duplicate_in_file'; duplicateKey: string }
   | { ok: false; reason: 'duplicate_in_db'; duplicateKey: string }
+
+export type LatestStockSnapshot = {
+  periodFrom: string
+  periodTo: string
+}
+
+export type StockSummary = {
+  stores: number
+  products: number
+  qty: number
+  rows: number
+  periodFrom: string | null
+  periodTo: string | null
+}
+
+export type ProductSearchResult = {
+  barcode: string
+  productName: string
+  productNameJa: string
+  totalQty: number
+  byStore: {
+    storeCode: string
+    storeName: string
+    qty: number
+  }[]
+}
 
 export function naturalKey(row: {
   periodFrom: string
@@ -122,6 +148,12 @@ export async function insertClientStockRows(rows: StockRow[]): Promise<StockRows
   return insertStockRowsStrict(inserts)
 }
 
+export async function deleteAllStockRows(): Promise<number> {
+  const db = getDb()
+  const deleted = await db.delete(stockRows).returning({ id: stockRows.id })
+  return deleted.length
+}
+
 export type ListStockRowsParams = {
   limit?: number
   offset?: number
@@ -131,6 +163,28 @@ export type ListStockRowsParams = {
 }
 
 const MAX_LIMIT = 20_000
+
+async function getLatestSnapshot(): Promise<LatestStockSnapshot | null> {
+  const db = getDb()
+  const latest = await db
+    .select({
+      periodFrom: stockRows.periodFrom,
+      periodTo: stockRows.periodTo,
+    })
+    .from(stockRows)
+    .orderBy(desc(stockRows.uploadedAt), desc(stockRows.id))
+    .limit(1)
+
+  if (latest.length === 0) return null
+  return latest[0]!
+}
+
+function buildSnapshotWhere(snapshot: LatestStockSnapshot) {
+  return and(
+    eq(stockRows.periodFrom, snapshot.periodFrom),
+    eq(stockRows.periodTo, snapshot.periodTo),
+  )
+}
 
 export async function listStockRows(params: ListStockRowsParams = {}): Promise<StockRowSelect[]> {
   const db = getDb()
@@ -164,6 +218,154 @@ export async function listStockRows(params: ListStockRowsParams = {}): Promise<S
     .orderBy(desc(stockRows.id))
     .limit(limit)
     .offset(offset)
+}
+
+export async function getStockSummary(): Promise<StockSummary> {
+  const db = getDb()
+  const latestSnapshot = await getLatestSnapshot()
+
+  if (!latestSnapshot) {
+    return {
+      stores: 0,
+      products: 0,
+      qty: 0,
+      rows: 0,
+      periodFrom: null,
+      periodTo: null,
+    }
+  }
+
+  const where = buildSnapshotWhere(latestSnapshot)
+  const summary = await db
+    .select({
+      stores: sql<number>`count(distinct ${stockRows.storeCode})`,
+      products: sql<number>`count(distinct ${stockRows.barcode})`,
+      qty: sql<number>`coalesce(sum(${stockRows.stockQty}), 0)`,
+      rows: sql<number>`count(*)`,
+    })
+    .from(stockRows)
+    .where(where)
+
+  const row = summary[0]
+  return {
+    stores: Number(row?.stores ?? 0),
+    products: Number(row?.products ?? 0),
+    qty: Number(row?.qty ?? 0),
+    rows: Number(row?.rows ?? 0),
+    periodFrom: latestSnapshot.periodFrom,
+    periodTo: latestSnapshot.periodTo,
+  }
+}
+
+function escapeLike(input: string) {
+  return input.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')
+}
+
+export async function searchProducts(params: {
+  query?: string
+  limit?: number
+}): Promise<{
+  query: string
+  periodFrom: string | null
+  periodTo: string | null
+  products: ProductSearchResult[]
+}> {
+  const db = getDb()
+  const latestSnapshot = await getLatestSnapshot()
+  const query = params.query?.trim() ?? ''
+  const limit = Math.min(Math.max(Number(params.limit) || 50, 1), 200)
+
+  if (!latestSnapshot) {
+    return {
+      query,
+      periodFrom: null,
+      periodTo: null,
+      products: [],
+    }
+  }
+
+  if (!query) {
+    return {
+      query,
+      periodFrom: latestSnapshot.periodFrom,
+      periodTo: latestSnapshot.periodTo,
+      products: [],
+    }
+  }
+
+  const like = `%${escapeLike(query.toLowerCase())}%`
+  const where = and(
+    buildSnapshotWhere(latestSnapshot),
+    or(
+      sql`lower(${stockRows.barcode}) like ${like} escape '\\'`,
+      sql`lower(${stockRows.productName}) like ${like} escape '\\'`,
+      sql`lower(${stockRows.productNameJa}) like ${like} escape '\\'`,
+    ),
+  )
+
+  const productRows = await db
+    .select({
+      barcode: stockRows.barcode,
+      productName: sql<string>`max(${stockRows.productName})`,
+      productNameJa: sql<string>`max(${stockRows.productNameJa})`,
+      totalQty: sql<number>`coalesce(sum(${stockRows.stockQty}), 0)`,
+    })
+    .from(stockRows)
+    .where(where)
+    .groupBy(stockRows.barcode)
+    .orderBy(asc(stockRows.barcode))
+    .limit(limit)
+
+  if (productRows.length === 0) {
+    return {
+      query,
+      periodFrom: latestSnapshot.periodFrom,
+      periodTo: latestSnapshot.periodTo,
+      products: [],
+    }
+  }
+
+  const barcodes = productRows.map((row) => row.barcode)
+  const storeRows = await db
+    .select({
+      barcode: stockRows.barcode,
+      storeCode: stockRows.storeCode,
+      storeName: sql<string>`max(${stockRows.storeName})`,
+      qty: sql<number>`coalesce(sum(${stockRows.stockQty}), 0)`,
+    })
+    .from(stockRows)
+    .where(
+      and(
+        buildSnapshotWhere(latestSnapshot),
+        or(...barcodes.map((barcode) => eq(stockRows.barcode, barcode))),
+      ),
+    )
+    .groupBy(stockRows.barcode, stockRows.storeCode)
+    .orderBy(asc(stockRows.barcode), asc(stockRows.storeCode))
+
+  const storesByBarcode = new Map<string, ProductSearchResult['byStore']>()
+  for (const row of storeRows) {
+    const stores = storesByBarcode.get(row.barcode) ?? []
+    stores.push({
+      storeCode: row.storeCode,
+      storeName: row.storeName,
+      qty: Number(row.qty ?? 0),
+    })
+    storesByBarcode.set(row.barcode, stores)
+  }
+
+  return {
+    query,
+    periodFrom: latestSnapshot.periodFrom,
+    periodTo: latestSnapshot.periodTo,
+    products: productRows.map((row) => ({
+      barcode: row.barcode,
+      productName: row.productName,
+      productNameJa: row.productNameJa,
+      totalQty: Number(row.totalQty ?? 0),
+      byStore: storesByBarcode.get(row.barcode) ?? [],
+    })),
+  }
 }
 
 export async function getStockRowById(id: number): Promise<StockRowSelect | undefined> {

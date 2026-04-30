@@ -1,12 +1,10 @@
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { SWRConfig } from 'swr'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { Toaster } from '@/components/ui/toaster'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
 import appCss from '../styles.css?url'
-
-const queryClient = new QueryClient()
 
 export const Route = createRootRoute({
   head: () => ({
@@ -31,13 +29,18 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <QueryClientProvider client={queryClient}>
+        <SWRConfig
+          value={{
+            revalidateOnFocus: true,
+            shouldRetryOnError: false,
+          }}
+        >
           <TooltipProvider>
             <Toaster />
             <Sonner />
             {children}
           </TooltipProvider>
-        </QueryClientProvider>
+        </SWRConfig>
         <Scripts />
       </body>
     </html>

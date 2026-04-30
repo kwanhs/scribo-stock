@@ -1,20 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
-import { getAllRows, type StockRow } from "@/lib/stockDb";
+import useSWR from "swr";
 
-export function useStockData() {
-  const [rows, setRows] = useState<StockRow[]>([]);
-  const [loading, setLoading] = useState(true);
+import { fetchStockSummary } from "@/lib/api/stockRows";
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    const all = await getAllRows();
-    setRows(all);
-    setLoading(false);
-  }, []);
+export function useStockSummary() {
+  const swr = useSWR("stock-summary", fetchStockSummary);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  return { rows, loading, refresh };
+  return {
+    summary: swr.data,
+    loading: swr.isLoading,
+    error: swr.error,
+    refresh: swr.mutate,
+  };
 }

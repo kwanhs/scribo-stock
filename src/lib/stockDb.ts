@@ -1,29 +1,4 @@
-import { openDB, type IDBPDatabase } from "idb";
-
-import type { StockRow } from "#/db/schema";
-
-export type { StockRow } from "#/db/schema";
-
-const DB_NAME = "stock-portal";
-const STORE = "rows";
-const META = "meta";
-
-let dbPromise: Promise<IDBPDatabase> | null = null;
-function getDb() {
-  if (!dbPromise) {
-    dbPromise = openDB(DB_NAME, 1, {
-      upgrade(db) {
-        const s = db.createObjectStore(STORE, { keyPath: "id" });
-        s.createIndex("storeCode", "storeCode");
-        s.createIndex("barcode", "barcode");
-        s.createIndex("groupCode", "groupCode");
-        s.createIndex("dptCode", "dptCode");
-        db.createObjectStore(META);
-      },
-    });
-  }
-  return dbPromise;
-}
+import type { StockRowInsert } from "#/db/schema";
 
 const num = (v: unknown): number => {
   if (v === null || v === undefined || v === "") return 0;
@@ -64,7 +39,7 @@ function pick(r: Record<string, unknown>, key: string): unknown {
   return fallback;
 }
 
-export function mapCsvRow(r: Record<string, unknown>): StockRow | null {
+export function mapCsvRow(r: Record<string, unknown>): StockRowInsert | null {
   const periodFrom = str(pick(r, "期間From"));
   const periodTo = str(pick(r, "期間To"));
   const storeCode = str(pick(r, "店鋪編號"));
@@ -72,7 +47,6 @@ export function mapCsvRow(r: Record<string, unknown>): StockRow | null {
   const productName = str(pick(r, "商品名"));
   if (!storeCode || !barcode || !productName) return null;
   return {
-    id: `${periodFrom}|${periodTo}|${storeCode}|${barcode}|${productName}`,
     periodFrom,
     periodTo,
     storeCode,
@@ -91,36 +65,6 @@ export function mapCsvRow(r: Record<string, unknown>): StockRow | null {
     productName,
     productNameJa: str(pick(r, "商品名(日本名)")),
     stockQty: num(pick(r, "庫存數量")),
-    uploadedAt: Date.now(),
+    uploadedAt: new Date(),
   };
-}
-
-export async function upsertRows(rows: StockRow[]) {
-  const db = await getDb();
-  const tx = db.transaction(STORE, "readwrite");
-  for (const row of rows) tx.store.put(row);
-  await tx.done;
-}
-
-export async function getAllRows(): Promise<StockRow[]> {
-  const db = await getDb();
-  return db.getAll(STORE) as Promise<StockRow[]>;
-}
-
-export async function clearAll() {
-  const db = await getDb();
-  await db.clear(STORE);
-  await db.clear(META);
-}
-
-export async function setMeta(key: string, value: unknown) {
-  const db = await getDb();
-  await db.put(META, value, key);
-}
-
-export async function getMeta<T = unknown>(
-  key: string
-): Promise<T | undefined> {
-  const db = await getDb();
-  return db.get(META, key) as Promise<T | undefined>;
 }
