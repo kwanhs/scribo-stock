@@ -30,7 +30,8 @@ const num = (v: unknown): number => {
   const n = Number(String(v).replace(/,/g, ""));
   return Number.isFinite(n) ? n : 0;
 };
-const str = (v: unknown): string => (v === null || v === undefined ? "" : String(v).trim());
+const str = (v: unknown): string =>
+  v === null || v === undefined ? "" : String(v).trim();
 
 // Barcodes can arrive as scientific notation strings (e.g. "4.89104E+12") when
 // Excel autoconverted them. Normalize back to a plain integer string when possible.
@@ -50,7 +51,10 @@ const normalizeBarcode = (v: unknown): string => {
 function pick(r: Record<string, unknown>, key: string): unknown {
   let fallback: unknown = "";
   for (const k of Object.keys(r)) {
-    const norm = k.replace(/^\uFEFF/, "").trim().replace(/_\d+$/, "");
+    const norm = k
+      .replace(/^\uFEFF/, "")
+      .trim()
+      .replace(/_\d+$/, "");
     if (norm === key) {
       const v = r[k];
       if (v !== null && v !== undefined && String(v).trim() !== "") return v;
@@ -65,9 +69,10 @@ export function mapCsvRow(r: Record<string, unknown>): StockRow | null {
   const periodTo = str(pick(r, "期間To"));
   const storeCode = str(pick(r, "店鋪編號"));
   const barcode = normalizeBarcode(pick(r, "條形碼"));
-  if (!storeCode || !barcode) return null;
+  const productName = str(pick(r, "商品名"));
+  if (!storeCode || !barcode || !productName) return null;
   return {
-    id: `${periodFrom}|${periodTo}|${storeCode}|${barcode}`,
+    id: `${periodFrom}|${periodTo}|${storeCode}|${barcode}|${productName}`,
     periodFrom,
     periodTo,
     storeCode,
@@ -83,7 +88,7 @@ export function mapCsvRow(r: Record<string, unknown>): StockRow | null {
     classCode: str(pick(r, "Class")),
     className: str(pick(r, "Class編號名")),
     barcode,
-    productName: str(pick(r, "商品名")),
+    productName,
     productNameJa: str(pick(r, "商品名(日本名)")),
     stockQty: num(pick(r, "庫存數量")),
     uploadedAt: Date.now(),
@@ -113,7 +118,9 @@ export async function setMeta(key: string, value: unknown) {
   await db.put(META, value, key);
 }
 
-export async function getMeta<T = unknown>(key: string): Promise<T | undefined> {
+export async function getMeta<T = unknown>(
+  key: string
+): Promise<T | undefined> {
   const db = await getDb();
   return db.get(META, key) as Promise<T | undefined>;
 }

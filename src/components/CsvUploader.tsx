@@ -38,7 +38,6 @@ export const CsvUploader = ({ onUploaded }: Props) => {
               const mapped = mapCsvRow(r);
               if (mapped) {
                 buffer.push(mapped);
-                kept++;
               }
             }
             if (buffer.length >= CHUNK) {
@@ -47,7 +46,10 @@ export const CsvUploader = ({ onUploaded }: Props) => {
               parser.pause();
               pending.push(
                 upsertRows(batch)
-                  .then(() => parser.resume())
+                  .then(() => {
+                    kept = kept + batch.length;
+                    parser.resume();
+                  })
                   .catch((e) => {
                     parser.abort();
                     reject(e);
@@ -80,7 +82,8 @@ export const CsvUploader = ({ onUploaded }: Props) => {
       console.error("CSV upload failed", err);
       toast({
         title: "Upload failed",
-        description: err instanceof Error ? err.message : "Unknown error parsing CSV.",
+        description:
+          err instanceof Error ? err.message : "Unknown error parsing CSV.",
         variant: "destructive",
       });
     } finally {
@@ -99,11 +102,17 @@ export const CsvUploader = ({ onUploaded }: Props) => {
       className="rounded-xl border-2 border-dashed border-border bg-card p-8 text-center transition-colors hover:border-primary/50 hover:bg-secondary/30"
     >
       <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-primary text-primary-foreground shadow-card">
-        {busy ? <Loader2 className="h-6 w-6 animate-spin" /> : <FileSpreadsheet className="h-6 w-6" />}
+        {busy ? (
+          <Loader2 className="h-6 w-6 animate-spin" />
+        ) : (
+          <FileSpreadsheet className="h-6 w-6" />
+        )}
       </div>
       <h3 className="mb-1 text-base font-semibold">Upload stock CSV</h3>
       <p className="mb-4 text-sm text-muted-foreground">
-        {busy ? `Processing… ${progress.toLocaleString()} rows` : "Drag & drop or pick a file. Existing rows are upserted by period + store + barcode."}
+        {busy
+          ? `Processing… ${progress.toLocaleString()} rows`
+          : "Drag & drop or pick a file. Existing rows are upserted by period + store + barcode."}
       </p>
       <input
         ref={inputRef}
@@ -116,7 +125,11 @@ export const CsvUploader = ({ onUploaded }: Props) => {
           e.target.value = "";
         }}
       />
-      <Button onClick={() => inputRef.current?.click()} disabled={busy} className="bg-gradient-primary hover:opacity-90">
+      <Button
+        onClick={() => inputRef.current?.click()}
+        disabled={busy}
+        className="bg-gradient-primary hover:opacity-90"
+      >
         <Upload className="mr-2 h-4 w-4" />
         Choose CSV
       </Button>

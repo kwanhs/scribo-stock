@@ -8,9 +8,9 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "scribo-stock-db",
-      "database_id": "REPLACE_ME_AFTER_wrangler_d1_create",
-      "migrations_dir": "drizzle/migrations"
-    }
-  ]
+      "database_name": "matsukiyo-stock",
+      "database_id": "55de791d-3f14-41c3-89c9-38202621b596",
+      "migrations_dir": "drizzle/migrations",
+    },
+  ],
 }

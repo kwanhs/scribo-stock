@@ -14,8 +14,8 @@ import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DemoNeonRouteImport } from './routes/demo/neon'
 import { Route as DemoDrizzleRouteImport } from './routes/demo/drizzle'
-import { Route as ApiCsvRedactUploadRouteImport } from './routes/api/csv/redact-upload'
 import { Route as ApiStockRowsRouteImport } from './routes/api/stock/rows'
+import { Route as ApiCsvRedactUploadRouteImport } from './routes/api/csv/redact-upload'
 
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
@@ -42,14 +42,14 @@ const DemoDrizzleRoute = DemoDrizzleRouteImport.update({
   path: '/demo/drizzle',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiCsvRedactUploadRoute = ApiCsvRedactUploadRouteImport.update({
-  id: '/api/csv/redact-upload',
-  path: '/api/csv/redact-upload',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiStockRowsRoute = ApiStockRowsRouteImport.update({
   id: '/api/stock/rows',
   path: '/api/stock/rows',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCsvRedactUploadRoute = ApiCsvRedactUploadRouteImport.update({
+  id: '/api/csv/redact-upload',
+  path: '/api/csv/redact-upload',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -158,18 +158,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DemoDrizzleRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/csv/redact-upload': {
-      id: '/api/csv/redact-upload'
-      path: '/api/csv/redact-upload'
-      fullPath: '/api/csv/redact-upload'
-      preLoaderRoute: typeof ApiCsvRedactUploadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/stock/rows': {
       id: '/api/stock/rows'
       path: '/api/stock/rows'
       fullPath: '/api/stock/rows'
       preLoaderRoute: typeof ApiStockRowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/csv/redact-upload': {
+      id: '/api/csv/redact-upload'
+      path: '/api/csv/redact-upload'
+      fullPath: '/api/csv/redact-upload'
+      preLoaderRoute: typeof ApiCsvRedactUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
